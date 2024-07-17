@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Send Products Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+        }
+        input[type="text"] {
+            width: 200px;
+            padding: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h2>Send Products Data</h2>
+    <form id="productForm">
+        <label for="productA">Product A Minimum:</label>
+        <input type="text" id="productA" name="productA" value="1"><br>
+
+        <label for="productB">Product B Minimum:</label>
+        <input type="text" id="productB" name="productB" value="1"><br>
+
+        <label for="productC">Product C Minimum:</label>
+        <input type="text" id="productC" name="productC" value="1"><br>
+
+        <button type="button" onclick="sendData()">Maximize profit</button>
+    </form>
+
+    <div id="imageContainer"></div>
+
+    <script>
+        function sendData() {
+            const productA = document.getElementById('productA').value;
+            const productB = document.getElementById('productB').value;
+            const productC = document.getElementById('productC').value;
+
+            const data = {
+                products_min: {
+                    "Product A": parseInt(productA),
+                    "Product B": parseInt(productB),
+                    "Product C": parseInt(productC)
+                }
+            };
+
+            fetch('http://127.0.0.1:8000/optimize', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('image')) {
+                    return response.blob(); // Convert response to a Blob
+                } else {
+                    throw new Error('Expected image response, but received invalid content type');
+                }
+            })
+            .then(blob => {
+                const imageUrl = URL.createObjectURL(blob); // Create a URL for the Blob
+                displayImage(imageUrl); // Display the image
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to optimize: ' + error.message); // Show error message to the user
+            });
+        }
+
+        function displayImage(imageUrl) {
+            const imageContainer = document.getElementById('imageContainer');
+            imageContainer.innerHTML = `<img src="${imageUrl}" alt="Optimized Image">`;
+        }
+    </script>
+</body>
+</html>

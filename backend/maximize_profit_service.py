@@ -3,6 +3,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import io
+import random
+
 matplotlib.use('Agg')
 
 
@@ -60,6 +62,7 @@ class ProductionOptimizer:
             production_levels = {product: int(self.decision_variables[product].solution_value()) for product in self.products_profits}
             max_profit = int(self.solver.Objective().Value())
             print(f"Max Profit: {max_profit}")
+            x=self.johnsons_method(self.format_product_data(production_levels))
             return self.create_chart(self.johnsons_method(self.format_product_data(production_levels)))
         else:
             raise Exception("The problem does not have an optimal solution.")
@@ -81,10 +84,12 @@ class ProductionOptimizer:
         optimal_order = [job[1] for job in ordered_jobs]
         
         return optimal_order
-    def calculate_job_schedule(self,input_data):
+    def calculate_job_schedule(self, input_data):
         jobs = []
         current_time_m1 = 0
         current_time_m2 = 0
+        idle_time_m1 = 0
+        idle_time_m2 = 0
 
         for product, time_m1, time_m2 in input_data:
             start_m1 = current_time_m1
@@ -92,20 +97,110 @@ class ProductionOptimizer:
             start_m2 = max(end_m1, current_time_m2)
             end_m2 = start_m2 + time_m2
 
+            # Calculate idle time for Machine 1
+            if start_m1 > current_time_m1:
+                idle_time_m1 += start_m1 - current_time_m1
+
+            # Calculate idle time for Machine 2
+            if start_m2 > current_time_m2:
+                idle_time_m2 += start_m2 - current_time_m2
+
             jobs.append([product, start_m1, end_m1, start_m2, end_m2])
 
             current_time_m1 = end_m1
             current_time_m2 = end_m2
 
+        # Final idle time until the end of the schedule
+        if current_time_m1 < self.machines['Machine 1']:
+            idle_time_m1 += self.machines['Machine 1']- current_time_m1
+        if current_time_m2 < self.machines['Machine 2']:
+            idle_time_m2 += self.machines['Machine 2'] - current_time_m2
+
+        return jobs, idle_time_m1, idle_time_m2
+
+
         return jobs
+    def generate_colors(self,n,seed=None):
+        """
+        Generate n unique colors.
+        Each color is represented as a hexadecimal string.
+        """
+        if seed is not None:
+            random.seed(seed)  # Set the seed for reproducibility
+    
+        colors = set()
+        while len(colors) < n:
+            # Generate a random hue between 0 and 360 (degrees)
+            hue = random.randint(0, 360)
+            # Generate a random saturation between 40% and 100% (to avoid dull colors)
+            saturation = random.randint(40, 100)
+            # Generate a random lightness between 30% and 70% (to avoid extreme dark or light colors)
+            lightness = random.randint(30, 70)
+            # Convert HSL to RGB
+            rgb_color = self.hsl_to_rgb(hue, saturation, lightness)
+            # Format as hexadecimal string
+            color = "#{:02x}{:02x}{:02x}".format(*rgb_color)
+            colors.add(color)
+        return list(colors)
+    def hsl_to_rgb(self,h, s, l):
+        """
+        Convert HSL (Hue, Saturation, Lightness) to RGB (Red, Green, Blue).
+        Input ranges: h = [0, 360], s = [0, 100], l = [0, 100]
+        Output ranges: r, g, b = [0, 255]
+        """
+        h /= 360
+        s /= 100
+        l /= 100
+        if s == 0:
+            r = g = b = l  # achromatic
+        else:
+            def hue_to_rgb(p, q, t):
+                if t < 0:
+                    t += 1
+                if t > 1:
+                    t -= 1
+                if t < 1/6:
+                    return p + (q - p) * 6 * t
+                if t < 1/2:
+                    return q
+                if t < 2/3:
+                    return p + (q - p) * (2/3 - t) * 6
+                return p
+
+            q = l * (1 + s) if l < 0.5 else l + s - l * s
+            p = 2 * l - q
+            r = hue_to_rgb(p, q, h + 1/3)
+            g = hue_to_rgb(p, q, h)
+            b = hue_to_rgb(p, q, h - 1/3)
+
+        return int(r * 255), int(g * 255), int(b * 255)
+
+
+
+    def assign_colors_to_products(self,products):
+            """
+            Assign a unique color to each product.
+            
+            :param products: List of tuples (product_name, ...)
+            :return: Dictionary with product name as key and assigned color as value
+            """
+            unique_product_names = set(product[0] for product in products)
+            n = len(unique_product_names)
+
+            colors = self.generate_colors(n,96)
+            product_colors = {product_name: colors[i] for i, product_name in enumerate(unique_product_names)}
+            return product_colors
     def create_chart(self,input_data):
-        jobs = self.calculate_job_schedule(input_data)
+        product_colors = self.assign_colors_to_products(input_data)
+        colors = {product: color for product, color in product_colors.items()}
+
+        jobs,idle_time_m1, idle_time_m2 = self.calculate_job_schedule(input_data)
 
         # Create figure and axis
         fig, ax = plt.subplots(figsize=(10, 6))
-
+    
     # Define the colors for different jobs
-        colors = {'Product A': 'skyblue', 'Product B': 'lightgreen'}
+        
 
     # Create the Gantt chart
         for job in jobs:
@@ -134,7 +229,20 @@ class ProductionOptimizer:
         buf.seek(0)
         
         # Return the plot as a response
-        return buf
+        return buf, idle_time_m1, idle_time_m2
+
+                    
+
+
+
+
+
+
+
+
+
+            
+
 
                     
 
