@@ -2,9 +2,11 @@
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from jobshop import JobShopScheduler
 from maximize_profit_service import ProductionOptimizer
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI()
 app.add_middleware(
@@ -28,6 +30,12 @@ products_time = {
     "Product B": {"Machine 1": 2, "Machine 2": 1, "Machine 3": 2},
     "Product C": {"Machine 1": 3, "Machine 2": 1, "Machine 3": 1}   # hours per unit
 }
+
+jobs_data = [
+        [(0, 3), (1, 2), (2, 2)],  # Job 0
+        [(0, 2), (2, 1), (1, 4)],  # Job 1
+        [(1, 4), (2, 3)],          # Job 2
+    ]
 
 
 class ProductsMinInput(BaseModel):
@@ -53,6 +61,15 @@ def optimize_production(input_data: ProductsMinInput):
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get('/jobshop')
+def jobshop():
+    scheduler = JobShopScheduler(jobs_data)
+    scheduler.solve()
+    gantt_chart_buffer = scheduler.gantt_chart()
+    return StreamingResponse(gantt_chart_buffer, media_type="image/png")
+
 
 
 
