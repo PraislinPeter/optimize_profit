@@ -15,7 +15,8 @@ app.add_middleware(
 )
 machines = {
     "Machine 1": 12,  # hours per day
-    "Machine 2": 9    # hours per day
+    "Machine 2": 9,
+    "Machine 3": 9    # hours per day
 }
 products_profits = {
     "Product A": 7,   # profit per unit
@@ -23,10 +24,11 @@ products_profits = {
     "Product C": 10   # profit per unit
 }
 products_time = {
-    "Product A": {"Machine 1": 3, "Machine 2": 3},  # hours per unit
-    "Product B": {"Machine 1": 2, "Machine 2": 1},
-     "Product C": {"Machine 1": 3, "Machine 2": 1} # hours per unit
+    "Product A": {"Machine 1": 3, "Machine 2": 3, "Machine 3": 2},  # hours per unit
+    "Product B": {"Machine 1": 2, "Machine 2": 1, "Machine 3": 2},
+    "Product C": {"Machine 1": 3, "Machine 2": 1, "Machine 3": 1}   # hours per unit
 }
+
 
 class ProductsMinInput(BaseModel):
     products_min: dict
@@ -40,14 +42,17 @@ def optimize_production(input_data: ProductsMinInput):
             products_time,
             input_data.products_min  # Ensure products_min is correctly passed
         )
-        chart_buf,m1,m2= optimizer.solve()
+        chart_buf, idle_times = optimizer.solve()
+        
+        # Set headers for idle times of each machine
         response = StreamingResponse(chart_buf, media_type="image/png")
-        response.headers["machine1"] = str(m1)
-        response.headers["machine2"] = str(m2)
-        print(response)
+        for i, idle_time in enumerate(idle_times):
+            response.headers[f"machine{i + 1}"] = str(idle_time)
+        
         return response
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 
 
